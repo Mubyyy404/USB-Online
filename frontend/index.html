@@ -1,180 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>USB Sentinel – Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>CyberMonitor Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: linear-gradient(135deg, #020617, #000000);
-      color: #22d3ee;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0b0f1a;
+  color: #00ffe1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
 
-    .card {
-      background: #020617;
-      padding: 30px;
-      width: 350px;
-      border-radius: 10px;
-      box-shadow: 0 0 20px #22d3ee33;
-    }
+.container {
+  background: #0f172a;
+  padding: 30px;
+  width: 320px;
+  border-radius: 8px;
+  box-shadow: 0 0 15px #00ffe1;
+}
 
-    h2 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
+h2 {
+  text-align: center;
+}
 
-    input {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border-radius: 5px;
-      border: none;
-      outline: none;
-    }
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  background: #020617;
+  border: 1px solid #00ffe1;
+  color: #00ffe1;
+}
 
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      background: #22d3ee;
-      color: #020617;
-      font-weight: bold;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
+button {
+  width: 100%;
+  margin-top: 15px;
+  padding: 10px;
+  font-weight: bold;
+  background: #00ffe1;
+  border: none;
+  cursor: pointer;
+}
 
-    button:hover {
-      background: #38bdf8;
-    }
+button:hover {
+  background: #00cbb8;
+}
 
-    .switch {
-      margin-top: 10px;
-      text-align: center;
-      cursor: pointer;
-      font-size: 14px;
-    }
-
-    .switch:hover {
-      text-decoration: underline;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .status {
-      margin-top: 10px;
-      font-size: 14px;
-      text-align: center;
-    }
-  </style>
+.switch {
+  text-align: center;
+  margin-top: 15px;
+  cursor: pointer;
+  font-size: 14px;
+}
+</style>
 </head>
 
 <body>
 
-  <div class="card">
-    <h2 id="title">Login</h2>
+<div class="container">
+  <h2 id="title">Login</h2>
 
-    <input type="email" id="email" placeholder="Email" />
-    <input type="password" id="password" placeholder="Password" />
+  <form onsubmit="login(event)" id="loginForm">
+    <input id="email" type="email" placeholder="Email" required>
+    <input id="password" type="password" placeholder="Password" required>
+    <button type="submit">Login</button>
+  </form>
 
-    <button onclick="loginUser()" id="loginBtn">Login</button>
-    <button onclick="registerUser()" id="registerBtn" class="hidden">Register</button>
+  <form onsubmit="register(event)" id="registerForm" style="display:none;">
+    <input id="regEmail" type="email" placeholder="Email" required>
+    <input id="regPassword" type="password" placeholder="Password" required>
+    <button type="submit">Register</button>
+  </form>
 
-    <div class="switch" onclick="toggleForm()" id="switchText">
-      Don't have an account? Register
-    </div>
+  <div class="switch" onclick="toggleForm()">Switch to Register / Login</div>
+</div>
 
-    <div class="status" id="status"></div>
-  </div>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import {
-      getAuth,
-      createUserWithEmailAndPassword,
-      signInWithEmailAndPassword,
-      onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
+  authDomain: "cybermonitor-1ab3c.firebaseapp.com",
+  projectId: "cybermonitor-1ab3c",
+  storageBucket: "cybermonitor-1ab3c.firebasestorage.app",
+  messagingSenderId: "569408987884",
+  appId: "1:569408987884:web:0839eb7932c206fc157bc9"
+};
 
-    // 🔥 YOUR FIREBASE CONFIG (UPDATED & CORRECT)
-    const firebaseConfig = {
-      apiKey: "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
-      authDomain: "cybermonitor-1ab3c.firebaseapp.com",
-      projectId: "cybermonitor-1ab3c",
-      storageBucket: "cybermonitor-1ab3c.appspot.com",
-      messagingSenderId: "569408987884",
-      appId: "1:569408987884:web:0839eb7932c206fc157bc9"
-    };
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
+function login(event) {
+  event.preventDefault();
 
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const statusText = document.getElementById("status");
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-    // REGISTER
-    window.registerUser = () => {
-      createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-        .then(() => {
-          statusText.innerText = "✅ Registered successfully. You can login now.";
-          toggleForm();
-        })
-        .catch(err => {
-          statusText.innerText = "❌ " + err.message;
-        });
-    };
+  auth.signInWithEmailAndPassword(email, password)
+    .then(() => {
+      window.location.href = "dashboard.html";
+    })
+    .catch(err => alert(err.message));
+}
 
-    // LOGIN
-    window.loginUser = () => {
-      signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-        .then(() => {
-          statusText.innerText = "✅ Login successful!";
-          // Later: redirect to dashboard
-          // window.location.href = "dashboard.html";
-        })
-        .catch(err => {
-          statusText.innerText = "❌ " + err.message;
-        });
-    };
+function register(event) {
+  event.preventDefault();
 
-    // AUTO LOGIN CHECK
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        statusText.innerText = "👤 Logged in as " + user.email;
-      }
-    });
+  const email = document.getElementById("regEmail").value;
+  const password = document.getElementById("regPassword").value;
 
-    // UI TOGGLE
-    window.toggleForm = () => {
-      document.getElementById("loginBtn").classList.toggle("hidden");
-      document.getElementById("registerBtn").classList.toggle("hidden");
+  auth.createUserWithEmailAndPassword(email, password)
+    .then(() => {
+      alert("Registration successful. Please login.");
+      toggleForm();
+    })
+    .catch(err => alert(err.message));
+}
 
-      const title = document.getElementById("title");
-      const switchText = document.getElementById("switchText");
+function toggleForm() {
+  const login = document.getElementById("loginForm");
+  const reg = document.getElementById("registerForm");
+  const title = document.getElementById("title");
 
-      if (title.innerText === "Login") {
-        title.innerText = "Register";
-        switchText.innerText = "Already have an account? Login";
-      } else {
-        title.innerText = "Login";
-        switchText.innerText = "Don't have an account? Register";
-      }
-
-      statusText.innerText = "";
-    };
-  </script>
+  if (login.style.display === "none") {
+    login.style.display = "block";
+    reg.style.display = "none";
+    title.innerText = "Login";
+  } else {
+    login.style.display = "none";
+    reg.style.display = "block";
+    title.innerText = "Register";
+  }
+}
+</script>
 
 </body>
 </html>
