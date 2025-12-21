@@ -7,122 +7,29 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
-/* ---------------- Modern Cyber UI ---------------- */
-body {
-  margin:0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #0d0d0d;
-  color: #fff;
-}
-.navbar {
-  height: 60px;
-  background: #111;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 20px;
-  box-shadow: 0 0 15px #0ff;
-}
-.navbar .hamburger {
-  cursor: pointer;
-  font-size: 24px;
-  color: #0ff;
-}
-.navbar .user-profile {
-  position: relative;
-  cursor: pointer;
-}
-.user-dropdown {
-  position: absolute;
-  right:0;
-  top:60px;
-  background:#111;
-  border:1px solid #0ff;
-  display:none;
-  min-width:220px;
-  z-index:100;
-  border-radius:6px;
-  overflow:hidden;
-}
-.user-dropdown a {
-  display:block;
-  padding:12px 15px;
-  color:#0ff;
-  text-decoration:none;
-  font-size:14px;
-}
-.user-dropdown a:hover {
-  background:#0ff;
-  color:#111;
-}
-.sidebar {
-  width:250px;
-  height:100vh;
-  background:#111;
-  position:fixed;
-  top:0;
-  left:-250px;
-  transition:0.3s;
-  border-right:1px solid #0ff;
-  padding-top:60px;
-  z-index:50;
-}
-.sidebar a {
-  display:block;
-  padding:15px 20px;
-  color:#0ff;
-  text-decoration:none;
-  font-weight:bold;
-}
-.sidebar a:hover {
-  background:#0ff;
-  color:#111;
-}
-.main {
-  margin-left:0;
-  padding:20px;
-  transition: margin-left 0.3s;
-}
-.card {
-  background:#1a1a1a;
-  border:1px solid #0ff;
-  padding:20px;
-  margin-bottom:20px;
-  border-radius:10px;
-  box-shadow: 0 0 20px #0ff40a10;
-}
-.table-container {
-  overflow-x:auto;
-}
-table {
-  width:100%;
-  border-collapse: collapse;
-}
-th,td {
-  padding:10px;
-  text-align:left;
-  border-bottom:1px solid #0ff;
-}
-th {
-  background:#111;
-}
-button {
-  background:#0ff;
-  color:#111;
-  border:none;
-  padding:10px 20px;
-  border-radius:5px;
-  cursor:pointer;
-  font-weight:bold;
-}
-button:hover {
-  background:#00cccc;
-}
-h1,h2 {
-  color:#0ff;
-  margin-bottom:10px;
-}
+body { margin:0; font-family:'Segoe UI', sans-serif; background:#0d0d0d; color:#fff; }
+.navbar{height:60px;background:#111;display:flex;justify-content:space-between;align-items:center;padding:0 20px;box-shadow:0 0 15px #0ff;}
+.navbar .hamburger{cursor:pointer;font-size:24px;color:#0ff;}
+.navbar .user-profile{position:relative;cursor:pointer;}
+.user-dropdown{position:absolute;right:0;top:60px;background:#111;border:1px solid #0ff;display:none;min-width:220px;z-index:100;border-radius:6px;overflow:hidden;}
+.user-dropdown a{display:block;padding:12px 15px;color:#0ff;text-decoration:none;font-size:14px;}
+.user-dropdown a:hover{background:#0ff;color:#111;}
+.sidebar{width:250px;height:100vh;background:#111;position:fixed;top:0;left:-250px;transition:0.3s;border-right:1px solid #0ff;padding-top:60px;z-index:50;}
+.sidebar a{display:block;padding:15px 20px;color:#0ff;text-decoration:none;font-weight:bold;}
+.sidebar a:hover{background:#0ff;color:#111;}
+.main{margin-left:0;padding:20px;transition: margin-left 0.3s;}
+.card{background:#1a1a1a;border:1px solid #0ff;padding:20px;margin-bottom:20px;border-radius:10px;box-shadow: 0 0 20px #0ff40a10;}
+.table-container{overflow-x:auto;}
+table{width:100%;border-collapse: collapse;}
+th,td{padding:10px;text-align:left;border-bottom:1px solid #0ff;}
+th{background:#111;}
+button{background:#0ff;color:#111;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-weight:bold;}
+button:hover{background:#00cccc;}
+h1,h2{color:#0ff;margin-bottom:10px;}
+.alert{color:#ff0040;font-weight:bold;}
 </style>
 </head>
 <body>
@@ -144,7 +51,8 @@ h1,h2 {
   <a href="#">USB Logs</a>
   <a href="#" onclick="downloadAgent()">Download Agent</a>
   <a href="#">Sandbox Simulation</a>
-  <a href="#">Reports</a>
+  <a href="#" onclick="exportPDF()">Export Logs PDF</a>
+  <a href="#" onclick="exportCSV()">Export Logs CSV</a>
   <a href="#">Settings</a>
 </div>
 
@@ -172,6 +80,16 @@ h1,h2 {
   </div>
 
   <div class="card">
+    <h2>BadUSB Alerts</h2>
+    <div id="alerts">Loading alerts...</div>
+  </div>
+
+  <div class="card">
+    <h2>Sandbox Simulation</h2>
+    <div id="sandbox">Loading sandbox results...</div>
+  </div>
+
+  <div class="card">
     <h2>Agent Download</h2>
     <button onclick="downloadAgent()">Download USB Sentinel Agent</button>
   </div>
@@ -195,13 +113,8 @@ const db = firebase.firestore();
 function toggleSidebar(){
   let sb = document.getElementById("sidebar");
   let main = document.getElementById("mainContent");
-  if(sb.style.left === "0px"){
-    sb.style.left = "-250px";
-    main.style.marginLeft = "0";
-  }else{
-    sb.style.left = "0px";
-    main.style.marginLeft = "250px";
-  }
+  if(sb.style.left === "0px"){ sb.style.left="-250px"; main.style.marginLeft="0"; }
+  else{ sb.style.left="0px"; main.style.marginLeft="250px"; }
 }
 
 // ---------------- User Dropdown ----------------
@@ -210,7 +123,7 @@ function toggleUserDropdown(){
   dropdown.style.display = (dropdown.style.display==="block")?"none":"block";
 }
 
-// ---------------- Firebase Auth ----------------
+// ---------------- Auth State ----------------
 auth.onAuthStateChanged(user=>{
   if(user){
     document.getElementById("welcomeUser").innerText = user.displayName||user.email;
@@ -218,12 +131,12 @@ auth.onAuthStateChanged(user=>{
     document.getElementById("profileName").innerText = "Name: " + (user.displayName||user.email);
     document.getElementById("profileEmail").innerText = "Email: " + user.email;
     loadUSBLogs();
-  }else{
-    window.location.href = "index.html"; // redirect to login if not logged in
-  }
+    loadAlerts();
+    loadSandbox();
+  }else{ window.location.href="index.html"; }
 });
 
-// ---------------- Load USB Logs ----------------
+// ---------------- USB Logs ----------------
 function loadUSBLogs(){
   const tbody = document.getElementById("usbLogs");
   tbody.innerHTML = "<tr><td colspan='5'>Loading logs...</td></tr>";
@@ -232,25 +145,86 @@ function loadUSBLogs(){
       tbody.innerHTML = "";
       snapshot.forEach(doc=>{
         const data = doc.data();
-        const row = `<tr>
+        tbody.innerHTML += `<tr>
           <td>${data.user||""}</td>
           <td>${data.device||""}</td>
           <td>${data.serial||""}</td>
           <td>${data.action||""}</td>
           <td>${data.time||""}</td>
         </tr>`;
-        tbody.innerHTML += row;
       });
     });
 }
 
-// ---------------- Download Agent ----------------
+// ---------------- Alerts ----------------
+function loadAlerts(){
+  const alertsDiv = document.getElementById("alerts");
+  db.collection("usb_logs")
+    .where("action","==","BadUSB detected")
+    .orderBy("time","desc")
+    .limit(10)
+    .onSnapshot(snapshot=>{
+      alertsDiv.innerHTML = "";
+      if(snapshot.empty){ alertsDiv.innerHTML="<p>No alerts</p>"; }
+      else{
+        snapshot.forEach(doc=>{
+          const d = doc.data();
+          alertsDiv.innerHTML += `<p class="alert">[${d.time}] ${d.user} - ${d.device}</p>`;
+        });
+      }
+    });
+}
+
+// ---------------- Sandbox Simulation ----------------
+function loadSandbox(){
+  const sbDiv = document.getElementById("sandbox");
+  db.collection("sandbox_results") // backend saves sandbox analysis here
+    .orderBy("time","desc")
+    .limit(10)
+    .onSnapshot(snapshot=>{
+      sbDiv.innerHTML = "";
+      if(snapshot.empty){ sbDiv.innerHTML="<p>No sandbox events</p>"; }
+      else{
+        snapshot.forEach(doc=>{
+          const d = doc.data();
+          sbDiv.innerHTML += `<p>[${d.time}] File: ${d.file} - Threat: ${d.threat_level}</p>`;
+        });
+      }
+    });
+}
+
+// ---------------- Agent Download ----------------
 function downloadAgent(){
-  // Replace with your actual EXE download URL from Firebase Storage
   window.open("https://firebasestorage.googleapis.com/v0/b/cybermonitor-1ab3c.appspot.com/o/sentinel_agent.exe?alt=media","_blank");
 }
 
-// ---------------- Change Password & Logout ----------------
+// ---------------- Export ----------------
+function exportPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  db.collection("usb_logs").orderBy("time","desc").get().then(snapshot=>{
+    let y=10;
+    snapshot.forEach(doc=>{
+      const d = doc.data();
+      doc.text(`${d.time} | ${d.user} | ${d.device} | ${d.serial} | ${d.action}`,10,y); y+=10;
+    });
+    doc.save("USB_Logs.pdf");
+  });
+}
+function exportCSV(){
+  db.collection("usb_logs").orderBy("time","desc").get().then(snapshot=>{
+    let data=[];
+    snapshot.forEach(doc=>data.push(doc.data()));
+    const csv = Papa.unparse(data);
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "USB_Logs.csv";
+    link.click();
+  });
+}
+
+// ---------------- Change Password / Logout ----------------
 function changePassword(){
   const user = auth.currentUser;
   if(user){
@@ -258,9 +232,7 @@ function changePassword(){
     if(newPass) user.updatePassword(newPass).then(()=>alert("Password updated!")).catch(e=>alert(e.message));
   }
 }
-function logout(){
-  auth.signOut().then(()=>window.location.href="index.html");
-}
+function logout(){ auth.signOut().then(()=>window.location.href="index.html"); }
 </script>
 
 </body>
