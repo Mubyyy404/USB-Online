@@ -1,118 +1,180 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>USB Sentinel</title>
+  <meta charset="UTF-8">
+  <title>USB Sentinel – Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-body {
-  margin: 0;
-  font-family: 'Segoe UI';
-  background: radial-gradient(circle, #020617, #000);
-  color: #e5e7eb;
-}
-.container {
-  width: 400px;
-  margin: 80px auto;
-  padding: 30px;
-  background: #020617;
-  border-radius: 12px;
-  box-shadow: 0 0 20px #0ff;
-}
-h2 { text-align: center; color: #22d3ee; }
-input, button {
-  width: 100%;
-  padding: 12px;
-  margin: 8px 0;
-  border-radius: 6px;
-  border: none;
-}
-input {
-  background: #020617;
-  border: 1px solid #22d3ee;
-  color: white;
-}
-button {
-  background: #22d3ee;
-  color: black;
-  font-weight: bold;
-  cursor: pointer;
-}
-button:hover { background: #06b6d4; }
-.hidden { display: none; }
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-td, th {
-  border: 1px solid #22d3ee;
-  padding: 8px;
-}
-</style>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #020617, #000000);
+      color: #22d3ee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      background: #020617;
+      padding: 30px;
+      width: 350px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px #22d3ee33;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 5px;
+      border: none;
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #22d3ee;
+      color: #020617;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #38bdf8;
+    }
+
+    .switch {
+      margin-top: 10px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .switch:hover {
+      text-decoration: underline;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 14px;
+      text-align: center;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="container" id="auth">
-  <h2>USB Sentinel</h2>
-  <input id="user" placeholder="Username">
-  <input id="pass" type="password" placeholder="Password">
-  <button onclick="login()">Login</button>
-  <button onclick="register()">Register</button>
-</div>
+  <div class="card">
+    <h2 id="title">Login</h2>
 
-<div class="container hidden" id="dash">
-  <h2>Dashboard</h2>
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
 
-  <h3>USB Logs</h3>
-  <table id="usb"></table>
+    <button onclick="loginUser()" id="loginBtn">Login</button>
+    <button onclick="registerUser()" id="registerBtn" class="hidden">Register</button>
 
-  <h3>Sandbox Results</h3>
-  <table id="sandbox"></table>
-</div>
+    <div class="switch" onclick="toggleForm()" id="switchText">
+      Don't have an account? Register
+    </div>
 
-<script>
-const API = "http://127.0.0.1:5000";
+    <div class="status" id="status"></div>
+  </div>
 
-function login() {
-  fetch(API + "/login", {
-    method: "POST",
-    credentials: "include",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({username:user.value, password:pass.value})
-  }).then(r => {
-    if (r.ok) loadDash();
-    else alert("Login failed");
-  });
-}
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-function register() {
-  fetch(API + "/register", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({username:user.value, password:pass.value})
-  }).then(r => alert(r.ok ? "Registered" : "User exists"));
-}
+    // 🔥 YOUR FIREBASE CONFIG (UPDATED & CORRECT)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
+      authDomain: "cybermonitor-1ab3c.firebaseapp.com",
+      projectId: "cybermonitor-1ab3c",
+      storageBucket: "cybermonitor-1ab3c.appspot.com",
+      messagingSenderId: "569408987884",
+      appId: "1:569408987884:web:0839eb7932c206fc157bc9"
+    };
 
-function loadDash() {
-  fetch(API + "/dashboard", {credentials:"include"})
-  .then(r => r.json())
-  .then(data => {
-    auth.classList.add("hidden");
-    dash.classList.remove("hidden");
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
 
-    usb.innerHTML = "<tr><th>Event</th><th>Device</th><th>Time</th></tr>";
-    data.usb.forEach(e =>
-      usb.innerHTML += `<tr><td>${e[0]}</td><td>${e[1]}</td><td>${e[2]}</td></tr>`
-    );
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const statusText = document.getElementById("status");
 
-    sandbox.innerHTML = "<tr><th>File</th><th>Result</th><th>Time</th></tr>";
-    data.sandbox.forEach(s =>
-      sandbox.innerHTML += `<tr><td>${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td></tr>`
-    );
-  });
-}
-</script>
+    // REGISTER
+    window.registerUser = () => {
+      createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
+        .then(() => {
+          statusText.innerText = "✅ Registered successfully. You can login now.";
+          toggleForm();
+        })
+        .catch(err => {
+          statusText.innerText = "❌ " + err.message;
+        });
+    };
+
+    // LOGIN
+    window.loginUser = () => {
+      signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
+        .then(() => {
+          statusText.innerText = "✅ Login successful!";
+          // Later: redirect to dashboard
+          // window.location.href = "dashboard.html";
+        })
+        .catch(err => {
+          statusText.innerText = "❌ " + err.message;
+        });
+    };
+
+    // AUTO LOGIN CHECK
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        statusText.innerText = "👤 Logged in as " + user.email;
+      }
+    });
+
+    // UI TOGGLE
+    window.toggleForm = () => {
+      document.getElementById("loginBtn").classList.toggle("hidden");
+      document.getElementById("registerBtn").classList.toggle("hidden");
+
+      const title = document.getElementById("title");
+      const switchText = document.getElementById("switchText");
+
+      if (title.innerText === "Login") {
+        title.innerText = "Register";
+        switchText.innerText = "Already have an account? Login";
+      } else {
+        title.innerText = "Login";
+        switchText.innerText = "Don't have an account? Register";
+      }
+
+      statusText.innerText = "";
+    };
+  </script>
 
 </body>
 </html>
