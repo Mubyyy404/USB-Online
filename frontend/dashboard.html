@@ -6,30 +6,83 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial;
-  background: #020617;
-  color: #00ffe1;
+*{box-sizing:border-box;font-family:Segoe UI,Arial}
+body{margin:0;background:#020617;color:#e5e7eb}
+
+/* HEADER */
+header{
+  height:60px;background:#0f172a;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;box-shadow:0 0 10px #00ffe1
+}
+.menu-btn{font-size:26px;cursor:pointer}
+.logo{font-weight:bold;color:#00ffe1}
+
+/* PROFILE */
+.profile{position:relative}
+.avatar{
+  width:36px;height:36px;border-radius:50%;
+  background:#00ffe1;color:#020617;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:bold;cursor:pointer
+}
+.profile-menu{
+  display:none;position:absolute;right:0;top:45px;
+  background:#0f172a;width:220px;
+  border:1px solid #00ffe1;border-radius:6px
+}
+.profile-menu div{
+  padding:10px;border-bottom:1px solid #1e293b;cursor:pointer
+}
+.profile-menu div:hover{background:#020617}
+
+/* SIDEBAR */
+.sidebar{
+  position:fixed;top:60px;left:-240px;
+  width:240px;height:100%;background:#0f172a;
+  transition:.3s;box-shadow:0 0 10px #00ffe1
+}
+.sidebar.active{left:0}
+.sidebar a{
+  display:block;padding:15px;color:#e5e7eb;
+  text-decoration:none;border-bottom:1px solid #1e293b
+}
+.sidebar a:hover{background:#020617}
+
+/* MAIN */
+main{padding:30px;margin-top:60px}
+.card{
+  background:#0f172a;padding:20px;margin-bottom:20px;
+  border-left:4px solid #00ffe1;
+  box-shadow:0 0 10px #00ffe1
 }
 
-header {
-  background: #0f172a;
-  padding: 15px;
-  display: flex;
-  justify-content: space-between;
-  box-shadow: 0 0 10px #00ffe1;
+/* BUTTON */
+button{
+  background:#00ffe1;border:none;
+  padding:8px 14px;cursor:pointer;font-weight:bold
 }
 
-button {
-  background: #00ffe1;
-  border: none;
-  padding: 6px 14px;
-  cursor: pointer;
+/* MODAL */
+.modal{
+  display:none;position:fixed;top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,.7);
+  align-items:center;justify-content:center
+}
+.modal-box{
+  background:#0f172a;padding:20px;width:300px;
+  border-radius:8px;box-shadow:0 0 10px #00ffe1
+}
+.modal-box input{
+  width:100%;padding:8px;margin-top:10px;
+  background:#020617;border:1px solid #00ffe1;color:white
 }
 
-main {
-  padding: 30px;
+/* LOGS */
+.log{
+  padding:8px;border-bottom:1px solid #1e293b;
+  font-size:14px
 }
 </style>
 </head>
@@ -37,20 +90,69 @@ main {
 <body>
 
 <header>
-  <div>🛡 CyberMonitor Dashboard</div>
-  <div>
-    <span id="email"></span>
-    <button onclick="logout()">Logout</button>
+  <div class="menu-btn" onclick="toggleSidebar()">☰</div>
+  <div class="logo">CyberMonitor</div>
+
+  <div class="profile">
+    <div class="avatar" onclick="toggleProfile()">U</div>
+    <div class="profile-menu" id="profileMenu">
+      <div id="pName">User</div>
+      <div id="pEmail">email</div>
+      <div onclick="openPassword()">Change Password</div>
+      <div onclick="logout()">Logout</div>
+    </div>
   </div>
 </header>
 
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <a href="#">📊 Dashboard</a>
+  <a href="#">🔌 USB Logs</a>
+  <a href="#">📥 Download Agent</a>
+  <a href="#">⚙ Settings</a>
+</div>
+
+<!-- MAIN -->
 <main>
-  <h2>Welcome</h2>
-  <p>USB monitoring system active.</p>
+
+  <div class="card">
+    <h2>Welcome</h2>
+    <p id="welcomeText">Loading user...</p>
+  </div>
+
+  <div class="card">
+    <h2>USB Activity Logs</h2>
+    <div id="logs">Loading logs...</div>
+  </div>
+
+  <div class="card">
+    <h2>Agent Download</h2>
+    <p>Install USB Sentinel Agent on your system</p>
+    <button onclick="downloadAgent()">Download Agent (.exe)</button>
+  </div>
+
+  <div class="card">
+    <h2>System Status</h2>
+    <p>🟢 USB Monitoring Active</p>
+  </div>
+
 </main>
 
+<!-- PASSWORD MODAL -->
+<div class="modal" id="passwordModal">
+  <div class="modal-box">
+    <h3>Change Password</h3>
+    <input type="password" id="newPassword" placeholder="New password">
+    <br><br>
+    <button onclick="changePassword()">Update</button>
+    <button onclick="closePassword()">Cancel</button>
+  </div>
+</div>
+
+<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -64,19 +166,69 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+const db = firebase.firestore();
 
-auth.onAuthStateChanged(user => {
-  if (!user) {
-    window.location.href = "index.html";
-  } else {
-    document.getElementById("email").innerText = user.email;
+/* AUTH CHECK */
+auth.onAuthStateChanged(user=>{
+  if(!user){
+    location.href="index.html";
+  }else{
+    document.querySelector(".avatar").innerText = user.email[0].toUpperCase();
+    document.getElementById("pEmail").innerText = user.email;
+    document.getElementById("pName").innerText = user.displayName || "User";
+    document.getElementById("welcomeText").innerText =
+      "Welcome back, " + (user.displayName || user.email);
+
+    loadLogs(user.email);
   }
 });
 
-function logout() {
-  auth.signOut().then(() => {
-    window.location.href = "index.html";
-  });
+/* LOAD USB LOGS (REALTIME) */
+function loadLogs(email){
+  db.collection("usb_logs")
+    .where("user","==",email)
+    .orderBy("time","desc")
+    .onSnapshot(snapshot=>{
+      let html="";
+      snapshot.forEach(doc=>{
+        const d=doc.data();
+        html+=`<div class="log">🔌 ${d.device} | ${d.action} <br><small>${d.time}</small></div>`;
+      });
+      document.getElementById("logs").innerHTML = html || "No logs yet";
+    });
+}
+
+/* UI */
+function toggleSidebar(){
+  document.getElementById("sidebar").classList.toggle("active");
+}
+function toggleProfile(){
+  const m=document.getElementById("profileMenu");
+  m.style.display = m.style.display==="block"?"none":"block";
+}
+
+/* PASSWORD */
+function openPassword(){
+  document.getElementById("passwordModal").style.display="flex";
+}
+function closePassword(){
+  document.getElementById("passwordModal").style.display="none";
+}
+function changePassword(){
+  const pwd=document.getElementById("newPassword").value;
+  auth.currentUser.updatePassword(pwd)
+    .then(()=>alert("Password updated successfully"))
+    .catch(e=>alert(e.message));
+}
+
+/* LOGOUT */
+function logout(){
+  auth.signOut().then(()=>location.href="index.html");
+}
+
+/* AGENT DOWNLOAD */
+function downloadAgent(){
+  alert("EXE Agent download will be enabled after build");
 }
 </script>
 
