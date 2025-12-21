@@ -1,0 +1,13 @@
+<h2>USB Sentinel Dashboard</h2>
+<ul id="log"></ul>
+
+<script>
+fetch("http://127.0.0.1:5000/api/events")
+.then(r => r.json())
+.then(data => {
+  let ul = document.getElementById("log");
+  data.forEach(e => {
+    ul.innerHTML += `<li>${e[1]} - ${e[2]} (${e[3]})</li>`;
+  });
+});
+</script>
