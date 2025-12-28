@@ -1,142 +1,80 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Cyber USB Monitor – Dashboard</title>
+<title>USB Security Dashboard</title>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
 <style>
-body{
-  font-family: Arial;
-  background:#020617;
-  color:white;
-  margin:0;
-}
-
-/* Top bar */
-.top{
-  background:#0f172a;
-  padding:15px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  border-bottom:1px solid #1e293b;
-}
-
-/* Cards */
-.card{
-  background:#020617;
-  margin:20px;
-  padding:20px;
-  border-radius:14px;
-  border:1px solid #1e293b;
-}
-
-/* Stats */
-.stat{
-  display:inline-block;
-  margin-right:20px;
-  padding:15px;
-  border-radius:12px;
-  background:#020617;
-  border:1px solid #38bdf8;
-}
-
-/* Buttons */
-button{
-  padding:10px 15px;
-  border-radius:8px;
-  border:none;
-  font-weight:bold;
-  cursor:pointer;
-}
-
-/* Table */
-table{
-  width:100%;
-  border-collapse:collapse;
-}
-th,td{
-  padding:10px;
-  border-bottom:1px solid #1e293b;
-}
-
-/* Colors */
-.red{color:#ef4444}
-.green{color:#22c55e}
-.yellow{color:#eab308}
-.blue{color:#38bdf8}
+body{background:#0b1220;color:white}
+.card{background:#111b2e;border-radius:18px}
+.badge{font-size:14px}
 </style>
 </head>
 
-<body>
+<body class="p-4">
 
-<!-- ================= Top Bar ================= -->
-<div class="top">
-  <h2>🛡 Cyber USB Monitor</h2>
+<h2>🛡 Cyber USB Monitor – Dashboard</h2>
+<hr>
 
-  <div>
-    <span id="uidbox" class="blue"></span>
-    &nbsp;&nbsp;
-    <button onclick="logout()">Logout</button>
-  </div>
+<div id="statusBanner" class="alert alert-warning">
+Checking agent connection…
 </div>
 
-<!-- ================= Agent Status ================= -->
-<div class="card">
-  <h3>Agent Connection Status</h3>
+<div class="row g-3">
 
-  <div class="stat">
-    Status:
-    <b id="agent_status" class="yellow">CHECKING...</b>
-  </div>
+<div class="col-md-4">
+<div class="card p-3">
+<h5>Agent Status</h5>
+<p>Status: <span id="agentStatus" class="badge bg-secondary">Checking…</span></p>
+<p>Machine: <span id="machineName">-</span></p>
+<p>Last Seen: <span id="lastSeen">-</span></p>
 
-  <p>Your agent must be running to receive real-time logs.</p>
+<button class="btn btn-success w-100" onclick="downloadAgent()">Download Python Agent</button>
+<br><br>
+<button class="btn btn-primary w-100" onclick="downloadBAT()">Download Auto-Start BAT</button>
+
+</div>
 </div>
 
-<!-- ================= Downloads ================= -->
-<div class="card">
-  <h3>Downloads</h3>
-
-  <button onclick="downloadAgent()">Download Python Agent</button>
-  <button onclick="downloadInstaller()">Download Installer (.bat)</button>
-
-  <p>Place both files together & update UID inside <b>monitor.py</b>.</p>
+<div class="col-md-4">
+<div class="card p-3">
+<h5>Connected USB Devices</h5>
+<ul id="usbList"></ul>
+</div>
 </div>
 
-<!-- ================= Stats ================= -->
-<div class="card">
-  <h3>System Statistics</h3>
-
-  <div class="stat">Total Events: <b id="total">0</b></div>
-  <div class="stat">Blocked: <b id="blocked" class="red">0</b></div>
-  <div class="stat">Allowed: <b id="allowed" class="green">0</b></div>
+<div class="col-md-4">
+<div class="card p-3">
+<h5>Actions</h5>
+<button class="btn btn-danger w-100">Block Unknown Devices</button><br><br>
+<button class="btn btn-warning w-100">Whitelist Current USB</button><br><br>
+<button class="btn btn-info w-100">Enable Email Alerts</button>
+</div>
 </div>
 
-<!-- ================= Logs Table ================= -->
-<div class="card">
-  <h3>Live USB Logs</h3>
+</div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Device</th>
-        <th>Machine</th>
-        <th>Action</th>
-        <th>Class</th>
-        <th>Severity</th>
-        <th>Time</th>
-      </tr>
-    </thead>
-    <tbody id="logs"></tbody>
-  </table>
+<br>
+
+<div class="card p-3">
+<h5>Event Logs</h5>
+<table class="table table-dark table-striped">
+<thead>
+<tr>
+<th>Device</th><th>Serial</th><th>Action</th><th>Severity</th><th>Time</th>
+</tr>
+</thead>
+<tbody id="logTable"></tbody>
+</table>
 </div>
 
 <script>
-/* ================= Firebase Config ================= */
+// ---------------- Firebase Setup ----------------
 const firebaseConfig = {
   apiKey: "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
   authDomain: "cybermonitor-1ab3c.firebaseapp.com",
@@ -147,99 +85,78 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-let USER_UID = null;
-
-/* ================= Auth Check ================= */
-auth.onAuthStateChanged(u=>{
-  if(!u){
-    location="index.html";
-    return;
-  }
-
-  USER_UID = u.uid;
-  document.getElementById("uidbox").innerText = "UID: " + USER_UID;
-
-  listenLogs();
-  checkAgent();
-});
-
-/* ================= Logout ================= */
-function logout(){
-  auth.signOut();
-}
-
-/* ================= Download Buttons ================= */
+// ---------- Agent Download Buttons ---------
 function downloadAgent(){
-  window.location = "monitor.py";
+  window.location.href = "monitor.py";
+}
+function downloadBAT(){
+  window.location.href = "start_agent.bat";
 }
 
-function downloadInstaller(){
-  window.location = "install.bat";
-}
+// ---------- Status + Logs Live Listener ----------
+auth.onAuthStateChanged(user=>{
+ if(!user) {
+   window.location = "login.html";
+   return;
+ }
 
-/* ================= Realtime Logs ================= */
-function listenLogs(){
-  db.collection("logs")
-    .where("uid","==",USER_UID)
-    .orderBy("timestamp","desc")
-    .onSnapshot(snap=>{
-      let tbody = document.getElementById("logs");
-      tbody.innerHTML="";
+ const uid = user.uid;
 
-      let total=0, blocked=0, allowed=0;
+ db.collection("users").doc(uid).onSnapshot(doc=>{
 
-      snap.forEach(doc=>{
-        const d=doc.data();
-        total++;
+   if(!doc.exists || !doc.data().status){
+     document.getElementById("agentStatus").className="badge bg-warning";
+     document.getElementById("agentStatus").innerText="Checking…";
+     return;
+   }
 
-        if(d.action=="BLOCKED") blocked++;
-        else allowed++;
+   const s = doc.data().status;
 
-        const row = `
-          <tr>
-            <td>${d.device_name} (${d.device_serial})</td>
-            <td>${d.machine}</td>
-            <td class="${d.action=='BLOCKED'?'red':'green'}">${d.action}</td>
-            <td>${d.class}</td>
-            <td class="${d.severity=='HIGH'?'red':'yellow'}">${d.severity}</td>
-            <td>${new Date(d.timestamp*1000).toLocaleString()}</td>
-          </tr>
-        `;
-        tbody.innerHTML += row;
-      });
+   document.getElementById("machineName").innerText = s.machine || "-";
+   document.getElementById("lastSeen").innerText = new Date(s.last_seen*1000).toLocaleString();
 
-      document.getElementById("total").innerText = total;
-      document.getElementById("blocked").innerText = blocked;
-      document.getElementById("allowed").innerText = allowed;
-    });
-}
+   if(s.online){
+     document.getElementById("agentStatus").className="badge bg-success";
+     document.getElementById("agentStatus").innerText="Online";
+     document.getElementById("statusBanner").className="alert alert-success";
+     document.getElementById("statusBanner").innerText="Agent connected";
+   }else{
+     document.getElementById("agentStatus").className="badge bg-danger";
+     document.getElementById("agentStatus").innerText="Offline";
+   }
 
-/* ================= Agent Online / Offline ================= */
-function checkAgent(){
-  db.collection("agents").doc(USER_UID)
-    .onSnapshot(doc=>{
-      if(!doc.exists){
-        document.getElementById("agent_status").innerHTML = "❌ OFFLINE";
-        document.getElementById("agent_status").className="red";
-        return;
-      }
+   const list=document.getElementById("usbList");
+   list.innerHTML="";
+   (s.usb_devices||[]).forEach(d=>{
+     list.innerHTML+=`<li>${d.device_name} — ${d.serial}</li>`;
+   });
 
-      const data = doc.data();
-      const now = Math.floor(Date.now()/1000);
+ });
 
-      if(now - data.last_seen <= 10){
-        document.getElementById("agent_status").innerHTML="🟢 ONLINE";
-        document.getElementById("agent_status").className="green";
-      } else {
-        document.getElementById("agent_status").innerHTML="🟡 IDLE";
-        document.getElementById("agent_status").className="yellow";
-      }
-    });
-}
+ // --------- Live logs table ----------
+ db.collection("users").doc(uid).collection("logs")
+ .orderBy("timestamp","desc")
+ .limit(20)
+ .onSnapshot(snap=>{
+  const t=document.getElementById("logTable");
+  t.innerHTML="";
+  snap.forEach(doc=>{
+    const d=doc.data();
+    t.innerHTML+=`
+     <tr>
+      <td>${d.device_name}</td>
+      <td>${d.device_serial}</td>
+      <td>${d.action}</td>
+      <td>${d.severity}</td>
+      <td>${new Date(d.timestamp*1000).toLocaleString()}</td>
+     </tr>`;
+  });
+ });
+
+});
 </script>
 
 </body>
