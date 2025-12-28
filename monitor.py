@@ -1,54 +1,83 @@
 import usb.core
 import usb.util
-import platform
 import time
+import platform
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-UID = "USER_FIREBASE_UID_HERE"  # dynamically set for each user
+# =====================================================
+# 🔐 SET USER UID (from dashboard)
+# =====================================================
+USER_UID = "PUT_USER_UID_HERE"
 
+# =====================================================
+# 🔥 FIREBASE SETUP
+# =====================================================
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-WHITELIST = ["SanDisk Ultra", "Logitech USB Receiver"]
+MACHINE_NAME = platform.node()
 
-def get_machine():
-    return platform.node()
+# whitelist names
+WHITELIST = [
+    "SanDisk Ultra",
+    "Logitech USB Receiver"
+]
 
-def severity(action):
-    return "HIGH" if action == "BLOCKED" else "LOW"
+def send_heartbeat():
+    db.collection("agents").document(USER_UID).set({
+        "machine": MACHINE_NAME,
+        "status": "ONLINE",
+        "last_seen": int(time.time())
+    })
 
-def log_event(name, serial, action, dev_class):
-    data = {
-        "uid": UID,
-        "device_serial": serial,
-        "device_name": name,
-        "machine": get_machine(),
+def log_event(name, serial, action):
+    entry = {
+        "uid": USER_UID,
+        "device_name": name or "UNKNOWN",
+        "device_serial": serial or "UNKNOWN",
+        "machine": MACHINE_NAME,
         "action": action,
-        "rule": "Unknown Device Policy" if action=="BLOCKED" else "Allowed Device",
-        "class": dev_class,
-        "timestamp": int(time.time()),
-        "severity": severity(action)
+        "rule": "Whitelist Policy" if action=="ALLOWED" else "Unknown Device Policy",
+        "class": "USB Device",
+        "severity": "LOW" if action=="ALLOWED" else "HIGH",
+        "timestamp": int(time.time())
     }
 
-    db.collection("logs").add(data)
-    print(data)
+    db.collection("logs").add(entry)
+    print(entry)
 
-while True:
-    devices = usb.core.find(find_all=True)
+def monitor_loop():
+    last_devices = set()
 
-    for d in devices:
-        try:
-            name = usb.util.get_string(d, d.iProduct)
-            serial = usb.util.get_string(d, d.iSerialNumber)
+    while True:
+        send_heartbeat()
 
-            if name in WHITELIST:
-                log_event(name, serial, "ALLOWED", "Mass Storage")
-            else:
-                log_event(name, serial, "BLOCKED", "Mass Storage")
+        devices = usb.core.find(find_all=True)
+        current = set()
 
-        except Exception as e:
-            pass
+        for dev in devices:
+            try:
+                name = usb.util.get_string(dev, dev.iProduct)
+                serial = usb.util.get_string(dev, dev.iSerialNumber)
+            except:
+                name = "UNKNOWN"
+                serial = "UNKNOWN"
 
-    time.sleep(5)
+            key = (name, serial)
+            current.add(key)
+
+            if key not in last_devices:
+                if name in WHITELIST:
+                    log_event(name, serial, "ALLOWED")
+                else:
+                    log_event(name, serial, "BLOCKED")
+
+        last_devices = current
+
+        time.sleep(4)
+
+if __name__ == "__main__":
+    print("Agent running...")
+    monitor_loop()
