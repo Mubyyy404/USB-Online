@@ -8,10 +8,14 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
 <style>
-body{font-family:Arial;background:#020617;color:white}
-.card{background:#020617;margin:20px;padding:20px;border-radius:14px;border:1px solid #38bdf8}
-.block{color:#ef4444}
-.allow{color:#22c55e}
+body{font-family:Arial;background:#020617;color:white;margin:0}
+.top{background:#0f172a;padding:15px;display:flex;justify-content:space-between;align-items:center}
+.card{background:#020617;margin:20px;padding:20px;border-radius:14px;border:1px solid #1e293b}
+.stat{display:inline-block;margin-right:20px;padding:15px;border-radius:12px;background:#020617;border:1px solid #38bdf8}
+button{padding:10px 15px;border-radius:8px;border:none;font-weight:bold;cursor:pointer}
+.red{color:#ef4444}
+.green{color:#22c55e}
+.yellow{color:#eab308}
 table{width:100%;border-collapse:collapse}
 th,td{padding:10px;border-bottom:1px solid #1e293b}
 </style>
@@ -19,12 +23,30 @@ th,td{padding:10px;border-bottom:1px solid #1e293b}
 
 <body>
 
-<h1 style="padding-left:20px">USB Security Monitor</h1>
-
-<button onclick="logout()" style="margin-left:20px">Logout</button>
+<div class="top">
+  <h2>🛡 Cyber USB Monitor Dashboard</h2>
+  <div>
+    <span id="uidbox"></span>
+    <button onclick="logout()">Logout</button>
+  </div>
+</div>
 
 <div class="card">
-  <h3>Live Events</h3>
+  <h3>Downloads</h3>
+  <button onclick="downloadAgent()">Download Python Agent</button>
+  <button onclick="downloadInstaller()">Download Installer (.bat)</button>
+</div>
+
+<div class="card">
+  <h3>System Stats</h3>
+
+  <div class="stat">Total Events: <b id="total">0</b></div>
+  <div class="stat">Blocked: <b id="blocked" class="red">0</b></div>
+  <div class="stat">Allowed: <b id="allowed" class="green">0</b></div>
+</div>
+
+<div class="card">
+  <h3>Live Device Logs</h3>
 
   <table>
     <thead>
@@ -56,32 +78,61 @@ firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
 
+let USER_UID=null;
+
 auth.onAuthStateChanged(u=>{
  if(!u) location="index.html";
 
+ USER_UID=u.uid;
+ document.getElementById("uidbox").innerText="UID: "+USER_UID;
+
  db.collection("logs")
-   .where("uid","==",u.uid)
+   .where("uid","==",USER_UID)
    .orderBy("timestamp","desc")
-   .onSnapshot(snap=>{
-      const tbody=document.getElementById("logs");
-      tbody.innerHTML="";
-      snap.forEach(doc=>{
-        const d=doc.data();
-        const row=`<tr>
-          <td>${d.device_name} (${d.device_serial})</td>
-          <td>${d.machine}</td>
-          <td class="${d.action=='BLOCKED'?'block':'allow'}">${d.action}</td>
-          <td>${d.class}</td>
-          <td>${d.severity}</td>
-          <td>${new Date(d.timestamp*1000).toLocaleString()}</td>
-        </tr>`;
-        tbody.innerHTML+=row;
-      });
-   });
+   .onSnapshot(updateUI);
 });
+
+function updateUI(snap){
+  const tbody=document.getElementById("logs");
+  let total=0,blocked=0,allowed=0;
+
+  tbody.innerHTML="";
+
+  snap.forEach(doc=>{
+    total++;
+    const d=doc.data();
+    if(d.action=="BLOCKED") blocked++;
+    else allowed++;
+
+    const row=`<tr>
+      <td>${d.device_name} (${d.device_serial})</td>
+      <td>${d.machine}</td>
+      <td class="${d.action=='BLOCKED'?'red':'green'}">${d.action}</td>
+      <td>${d.class}</td>
+      <td class="${d.severity=='HIGH'?'red':'yellow'}">${d.severity}</td>
+      <td>${new Date(d.timestamp*1000).toLocaleString()}</td>
+    </tr>`;
+
+    tbody.innerHTML+=row;
+  });
+
+  document.getElementById("total").innerText=total;
+  document.getElementById("blocked").innerText=blocked;
+  document.getElementById("allowed").innerText=allowed;
+}
 
 function logout(){auth.signOut();}
 
+// download buttons
+function downloadAgent(){
+  window.location="agent/monitor.py";
+}
+
+function downloadInstaller(){
+  window.location="agent/install.bat";
+}
+
 </script>
+
 </body>
 </html>
