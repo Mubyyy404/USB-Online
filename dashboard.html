@@ -3,50 +3,122 @@
 <head>
 <title>Cyber USB Monitor – Dashboard</title>
 
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
 <style>
-body{font-family:Arial;background:#020617;color:white;margin:0}
-.top{background:#0f172a;padding:15px;display:flex;justify-content:space-between;align-items:center}
-.card{background:#020617;margin:20px;padding:20px;border-radius:14px;border:1px solid #1e293b}
-.stat{display:inline-block;margin-right:20px;padding:15px;border-radius:12px;background:#020617;border:1px solid #38bdf8}
-button{padding:10px 15px;border-radius:8px;border:none;font-weight:bold;cursor:pointer}
+body{
+  font-family: Arial;
+  background:#020617;
+  color:white;
+  margin:0;
+}
+
+/* Top bar */
+.top{
+  background:#0f172a;
+  padding:15px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid #1e293b;
+}
+
+/* Cards */
+.card{
+  background:#020617;
+  margin:20px;
+  padding:20px;
+  border-radius:14px;
+  border:1px solid #1e293b;
+}
+
+/* Stats */
+.stat{
+  display:inline-block;
+  margin-right:20px;
+  padding:15px;
+  border-radius:12px;
+  background:#020617;
+  border:1px solid #38bdf8;
+}
+
+/* Buttons */
+button{
+  padding:10px 15px;
+  border-radius:8px;
+  border:none;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+/* Table */
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+th,td{
+  padding:10px;
+  border-bottom:1px solid #1e293b;
+}
+
+/* Colors */
 .red{color:#ef4444}
 .green{color:#22c55e}
 .yellow{color:#eab308}
-table{width:100%;border-collapse:collapse}
-th,td{padding:10px;border-bottom:1px solid #1e293b}
+.blue{color:#38bdf8}
 </style>
 </head>
 
 <body>
 
+<!-- ================= Top Bar ================= -->
 <div class="top">
-  <h2>🛡 Cyber USB Monitor Dashboard</h2>
+  <h2>🛡 Cyber USB Monitor</h2>
+
   <div>
-    <span id="uidbox"></span>
+    <span id="uidbox" class="blue"></span>
+    &nbsp;&nbsp;
     <button onclick="logout()">Logout</button>
   </div>
 </div>
 
+<!-- ================= Agent Status ================= -->
 <div class="card">
-  <h3>Downloads</h3>
-  <button onclick="downloadAgent()">Download Python Agent</button>
-  <button onclick="downloadInstaller()">Download Installer (.bat)</button>
+  <h3>Agent Connection Status</h3>
+
+  <div class="stat">
+    Status:
+    <b id="agent_status" class="yellow">CHECKING...</b>
+  </div>
+
+  <p>Your agent must be running to receive real-time logs.</p>
 </div>
 
+<!-- ================= Downloads ================= -->
 <div class="card">
-  <h3>System Stats</h3>
+  <h3>Downloads</h3>
+
+  <button onclick="downloadAgent()">Download Python Agent</button>
+  <button onclick="downloadInstaller()">Download Installer (.bat)</button>
+
+  <p>Place both files together & update UID inside <b>monitor.py</b>.</p>
+</div>
+
+<!-- ================= Stats ================= -->
+<div class="card">
+  <h3>System Statistics</h3>
 
   <div class="stat">Total Events: <b id="total">0</b></div>
   <div class="stat">Blocked: <b id="blocked" class="red">0</b></div>
   <div class="stat">Allowed: <b id="allowed" class="green">0</b></div>
 </div>
 
+<!-- ================= Logs Table ================= -->
 <div class="card">
-  <h3>Live Device Logs</h3>
+  <h3>Live USB Logs</h3>
 
   <table>
     <thead>
@@ -64,7 +136,7 @@ th,td{padding:10px;border-bottom:1px solid #1e293b}
 </div>
 
 <script>
-
+/* ================= Firebase Config ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
   authDomain: "cybermonitor-1ab3c.firebaseapp.com",
@@ -75,63 +147,99 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-const auth=firebase.auth();
-const db=firebase.firestore();
 
-let USER_UID=null;
+const auth = firebase.auth();
+const db = firebase.firestore();
 
+let USER_UID = null;
+
+/* ================= Auth Check ================= */
 auth.onAuthStateChanged(u=>{
- if(!u) location="index.html";
+  if(!u){
+    location="index.html";
+    return;
+  }
 
- USER_UID=u.uid;
- document.getElementById("uidbox").innerText="UID: "+USER_UID;
+  USER_UID = u.uid;
+  document.getElementById("uidbox").innerText = "UID: " + USER_UID;
 
- db.collection("logs")
-   .where("uid","==",USER_UID)
-   .orderBy("timestamp","desc")
-   .onSnapshot(updateUI);
+  listenLogs();
+  checkAgent();
 });
 
-function updateUI(snap){
-  const tbody=document.getElementById("logs");
-  let total=0,blocked=0,allowed=0;
-
-  tbody.innerHTML="";
-
-  snap.forEach(doc=>{
-    total++;
-    const d=doc.data();
-    if(d.action=="BLOCKED") blocked++;
-    else allowed++;
-
-    const row=`<tr>
-      <td>${d.device_name} (${d.device_serial})</td>
-      <td>${d.machine}</td>
-      <td class="${d.action=='BLOCKED'?'red':'green'}">${d.action}</td>
-      <td>${d.class}</td>
-      <td class="${d.severity=='HIGH'?'red':'yellow'}">${d.severity}</td>
-      <td>${new Date(d.timestamp*1000).toLocaleString()}</td>
-    </tr>`;
-
-    tbody.innerHTML+=row;
-  });
-
-  document.getElementById("total").innerText=total;
-  document.getElementById("blocked").innerText=blocked;
-  document.getElementById("allowed").innerText=allowed;
+/* ================= Logout ================= */
+function logout(){
+  auth.signOut();
 }
 
-function logout(){auth.signOut();}
-
-// download buttons
+/* ================= Download Buttons ================= */
 function downloadAgent(){
-  window.location="monitor.py";
+  window.location = "agent/monitor.py";
 }
 
 function downloadInstaller(){
-  window.location="install.bat";
+  window.location = "agent/install.bat";
 }
 
+/* ================= Realtime Logs ================= */
+function listenLogs(){
+  db.collection("logs")
+    .where("uid","==",USER_UID)
+    .orderBy("timestamp","desc")
+    .onSnapshot(snap=>{
+      let tbody = document.getElementById("logs");
+      tbody.innerHTML="";
+
+      let total=0, blocked=0, allowed=0;
+
+      snap.forEach(doc=>{
+        const d=doc.data();
+        total++;
+
+        if(d.action=="BLOCKED") blocked++;
+        else allowed++;
+
+        const row = `
+          <tr>
+            <td>${d.device_name} (${d.device_serial})</td>
+            <td>${d.machine}</td>
+            <td class="${d.action=='BLOCKED'?'red':'green'}">${d.action}</td>
+            <td>${d.class}</td>
+            <td class="${d.severity=='HIGH'?'red':'yellow'}">${d.severity}</td>
+            <td>${new Date(d.timestamp*1000).toLocaleString()}</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+
+      document.getElementById("total").innerText = total;
+      document.getElementById("blocked").innerText = blocked;
+      document.getElementById("allowed").innerText = allowed;
+    });
+}
+
+/* ================= Agent Online / Offline ================= */
+function checkAgent(){
+  db.collection("agents").doc(USER_UID)
+    .onSnapshot(doc=>{
+      if(!doc.exists){
+        document.getElementById("agent_status").innerHTML = "❌ OFFLINE";
+        document.getElementById("agent_status").className="red";
+        return;
+      }
+
+      const data = doc.data();
+      const now = Math.floor(Date.now()/1000);
+
+      if(now - data.last_seen <= 10){
+        document.getElementById("agent_status").innerHTML="🟢 ONLINE";
+        document.getElementById("agent_status").className="green";
+      } else {
+        document.getElementById("agent_status").innerHTML="🟡 IDLE";
+        document.getElementById("agent_status").className="yellow";
+      }
+    });
+}
 </script>
 
 </body>
