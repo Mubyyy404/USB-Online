@@ -3,33 +3,83 @@
 <head>
   <title>Cyber USB Monitor – Login</title>
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
   <style>
-    body{font-family:Arial;background:#0f172a;color:white;display:flex;justify-content:center;align-items:center;height:100vh}
-    .card{background:#020617;padding:30px;border-radius:12px;box-shadow:0 0 25px #38bdf8}
-    input{padding:10px;margin:10px;width:100%;}
-    button{padding:10px 20px;background:#38bdf8;border:none;color:black;font-weight:bold;border-radius:6px;cursor:pointer}
+    body{
+      font-family: Arial;
+      background: linear-gradient(135deg,#020617,#0f172a,#020617);
+      height:100vh;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      color:white;
+      margin:0;
+    }
+
+    .card{
+      background: rgba(2,6,23,0.9);
+      padding:35px;
+      border-radius:16px;
+      width:320px;
+      box-shadow:0 0 35px rgba(56,189,248,.35);
+      backdrop-filter: blur(6px);
+      text-align:center;
+    }
+
+    input{
+      width:100%;
+      padding:10px;
+      margin-top:10px;
+      border-radius:8px;
+      background:#020617;
+      border:1px solid #1e293b;
+      color:white;
+    }
+
+    button{
+      margin-top:15px;
+      padding:10px 20px;
+      width:100%;
+      background:#38bdf8;
+      border:none;
+      border-radius:8px;
+      font-weight:bold;
+      cursor:pointer;
+    }
+
+    a{
+      color:#22c55e;
+      text-decoration:none;
+    }
+
+    .error{
+      color:#ef4444;
+      font-size:13px;
+      min-height:18px;
+    }
   </style>
 </head>
 
 <body>
 
 <div class="card">
-  <h2>Cyber USB Monitor</h2>
+  <h2>🛡 Cyber USB Monitor</h2>
+  <p>Secure USB Access Dashboard</p>
 
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
 
   <button onclick="login()">Login</button>
 
-  <p id="msg"></p>
+  <p class="error" id="msg"></p>
+
+  <p>No account? <a href="register.html">Create one</a></p>
 </div>
 
 <script>
-
 const firebaseConfig = {
   apiKey: "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
   authDomain: "cybermonitor-1ab3c.firebaseapp.com",
@@ -47,10 +97,14 @@ function login(){
   const pass=document.getElementById("password").value;
 
   auth.signInWithEmailAndPassword(email,pass)
-    .then(()=>{window.location="dashboard.html"})
-    .catch(e=>document.getElementById("msg").innerText=e.message);
+    .then(()=>{
+        window.location="dashboard.html";
+    })
+    .catch(err=>{
+        document.getElementById("msg").innerText = err.message;
+    });
 }
-
 </script>
+
 </body>
 </html>
