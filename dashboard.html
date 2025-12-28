@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Cyber USB Monitor – Dashboard</title>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+<style>
+body{font-family:Arial;background:#020617;color:white}
+.card{background:#020617;margin:20px;padding:20px;border-radius:14px;border:1px solid #38bdf8}
+.block{color:#ef4444}
+.allow{color:#22c55e}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #1e293b}
+</style>
+</head>
+
+<body>
+
+<h1 style="padding-left:20px">USB Security Monitor</h1>
+
+<button onclick="logout()" style="margin-left:20px">Logout</button>
+
+<div class="card">
+  <h3>Live Events</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Device</th>
+        <th>Machine</th>
+        <th>Action</th>
+        <th>Class</th>
+        <th>Severity</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="logs"></tbody>
+  </table>
+</div>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
+  authDomain: "cybermonitor-1ab3c.firebaseapp.com",
+  projectId: "cybermonitor-1ab3c",
+  storageBucket: "cybermonitor-1ab3c.appspot.com",
+  messagingSenderId: "569408987884",
+  appId: "1:569408987884:web:0839eb7932c206fc157bc9",
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const db=firebase.firestore();
+
+auth.onAuthStateChanged(u=>{
+ if(!u) location="index.html";
+
+ db.collection("logs")
+   .where("uid","==",u.uid)
+   .orderBy("timestamp","desc")
+   .onSnapshot(snap=>{
+      const tbody=document.getElementById("logs");
+      tbody.innerHTML="";
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const row=`<tr>
+          <td>${d.device_name} (${d.device_serial})</td>
+          <td>${d.machine}</td>
+          <td class="${d.action=='BLOCKED'?'block':'allow'}">${d.action}</td>
+          <td>${d.class}</td>
+          <td>${d.severity}</td>
+          <td>${new Date(d.timestamp*1000).toLocaleString()}</td>
+        </tr>`;
+        tbody.innerHTML+=row;
+      });
+   });
+});
+
+function logout(){auth.signOut();}
+
+</script>
+</body>
+</html>
