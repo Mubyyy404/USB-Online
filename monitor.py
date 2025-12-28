@@ -1,83 +1,87 @@
-import usb.core
-import usb.util
+import pyrebase
 import time
-import platform
-import firebase_admin
-from firebase_admin import credentials, firestore
+import socket
+import psutil
+import wmi
+from datetime import datetime
 
-# =====================================================
-# 🔐 SET USER UID (from dashboard)
-# =====================================================
-USER_UID = "PUT_USER_UID_HERE"
+# ===================== FIREBASE CONFIG =====================
+FIREBASE_CONFIG = {
+    "apiKey": "AIzaSyCIY6AiBsGrq7wM0BBYGW2lM_0FLWjnH0k",
+    "authDomain": "cybermonitor-1ab3c.firebaseapp.com",
+    "projectId": "cybermonitor-1ab3c",
+    "storageBucket": "cybermonitor-1ab3c.appspot.com",
+    "messagingSenderId": "569408987884",
+    "appId": "1:569408987884:web:0839eb7932c206fc157bc9",
+    "databaseURL": ""  # Leave blank, Firestore uses REST through pyrebase
+}
 
-# =====================================================
-# 🔥 FIREBASE SETUP
-# =====================================================
-cred = credentials.Certificate("serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+USER_EMAIL = "SAME_EMAIL_USED_IN_LOGIN"
+USER_PASSWORD = "PASSWORD"
+# ============================================================
 
-MACHINE_NAME = platform.node()
+firebase = pyrebase.initialize_app(FIREBASE_CONFIG)
+auth = firebase.auth()
+db = firebase.database()
 
-# whitelist names
-WHITELIST = [
-    "SanDisk Ultra",
-    "Logitech USB Receiver"
-]
+print("\nLogging into Firebase user account...")
+user = auth.sign_in_with_email_and_password(USER_EMAIL, USER_PASSWORD)
+uid = user["localId"]
 
-def send_heartbeat():
-    db.collection("agents").document(USER_UID).set({
-        "machine": MACHINE_NAME,
-        "status": "ONLINE",
-        "last_seen": int(time.time())
-    })
+hostname = socket.gethostname()
+w = wmi.WMI()
 
-def log_event(name, serial, action):
-    entry = {
-        "uid": USER_UID,
-        "device_name": name or "UNKNOWN",
-        "device_serial": serial or "UNKNOWN",
-        "machine": MACHINE_NAME,
-        "action": action,
-        "rule": "Whitelist Policy" if action=="ALLOWED" else "Unknown Device Policy",
-        "class": "USB Device",
-        "severity": "LOW" if action=="ALLOWED" else "HIGH",
-        "timestamp": int(time.time())
-    }
+known_devices = set()
 
-    db.collection("logs").add(entry)
-    print(entry)
+def get_usb_devices():
+    devices = []
+    for d in w.Win32_DiskDrive():
+        if "USB" in str(d.InterfaceType):
+            devices.append({
+                "device_name": d.Model,
+                "serial": getattr(d, "SerialNumber", "UNKNOWN"),
+            })
+    return devices
 
-def monitor_loop():
-    last_devices = set()
+while True:
+    try:
+        usb_list = get_usb_devices()
 
-    while True:
-        send_heartbeat()
+        # detect newly attached
+        current_serials = {d['serial'] for d in usb_list}
+        new_devices = current_serials - known_devices
+        known_devices.update(current_serials)
 
-        devices = usb.core.find(find_all=True)
-        current = set()
+        status = {
+            "online": True,
+            "machine": hostname,
+            "last_seen": int(time.time()),
+            "active_user": psutil.users()[0].name if psutil.users() else "UNKNOWN",
+            "usb_devices": usb_list
+        }
 
-        for dev in devices:
-            try:
-                name = usb.util.get_string(dev, dev.iProduct)
-                serial = usb.util.get_string(dev, dev.iSerialNumber)
-            except:
-                name = "UNKNOWN"
-                serial = "UNKNOWN"
+        # update live agent status
+        db.child("users").child(uid).child("status").set(status, user["idToken"])
 
-            key = (name, serial)
-            current.add(key)
+        # log any new USB devices
+        for dev in usb_list:
+            if dev["serial"] in new_devices:
+                log_entry = {
+                    "device_serial": dev["serial"],
+                    "device_name": dev["device_name"],
+                    "machine": hostname,
+                    "action": "CONNECTED",
+                    "rule": "Detection Event",
+                    "class": "Mass Storage",
+                    "timestamp": int(time.time()),
+                    "severity": "MEDIUM"
+                }
+                db.child("users").child(uid).child("logs").push(log_entry, user["idToken"])
 
-            if key not in last_devices:
-                if name in WHITELIST:
-                    log_event(name, serial, "ALLOWED")
-                else:
-                    log_event(name, serial, "BLOCKED")
+        print("Heartbeat OK", datetime.now(), status)
 
-        last_devices = current
+        time.sleep(8)
 
-        time.sleep(4)
-
-if __name__ == "__main__":
-    print("Agent running...")
-    monitor_loop()
+    except Exception as e:
+        print("Error:", e)
+        time.sleep(5)
